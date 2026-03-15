@@ -17,6 +17,13 @@ end
 target 'TalkingDog' do
   config = use_native_modules!
 
+  # react-native-permissions: declare only the permissions you actually use
+  permissions_path = '../node_modules/react-native-permissions/ios'
+  pod 'Permission-Bluetooth', :path => "#{permissions_path}/Bluetooth"
+  pod 'Permission-Microphone', :path => "#{permissions_path}/Microphone"
+  pod 'Permission-Camera', :path => "#{permissions_path}/Camera"
+  pod 'Permission-PhotoLibrary', :path => "#{permissions_path}/PhotoLibrary"
+
   use_react_native!(
     :path => config[:reactNativePath],
     # An absolute path to your application root.

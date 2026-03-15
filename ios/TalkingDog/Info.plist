@@ -34,8 +34,31 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<!-- Bluetooth — required for collar connection -->
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>Talking Dog uses Bluetooth to connect to your Merlin collar so your dog can speak.</string>
+	<key>NSBluetoothPeripheralUsageDescription</key>
+	<string>Talking Dog uses Bluetooth to connect to your Merlin collar.</string>
+
+	<!-- Microphone — for capturing audio context -->
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Talking Dog uses the microphone to capture audio so your dog's AI can understand what's happening around them.</string>
+
+	<!-- Camera & Photos — for dog profile photo -->
+	<key>NSCameraUsageDescription</key>
+	<string>Talking Dog uses the camera to take a photo of your dog for their profile.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Talking Dog accesses your photo library so you can pick a photo of your dog.</string>
+
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string></string>
+
+	<!-- Background BLE — keep collar connection alive -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>bluetooth-central</string>
+		<string>audio</string>
+	</array>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIRequiredDeviceCapabilities</key>
