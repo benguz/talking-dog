@@ -16,7 +16,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { launchImageLibrary } from 'react-native-image-picker';
 import { useDogStore } from '../store/dogStore';
-import { COLORS, RADIUS, SPACING } from '../components/theme';
+import { COLORS, HEADING_FONT_FAMILY, RADIUS, SPACING } from '../components/theme';
 import {
   DogPersonalityTrait,
   DogVoiceStyle,
@@ -107,7 +107,7 @@ export default function OnboardingScreen() {
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={{ flex: 1 }}>
-          <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+          <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
 
             {step === 'welcome' && (
               <WelcomeStep onNext={() => { setHasCollar(null); goNext(); }} />
@@ -130,7 +130,10 @@ export default function OnboardingScreen() {
               <DetailsStep
                 breed={dogProfile.breed}
                 age={dogProfile.age}
-                additionalContext={dogProfile.additionalContext}
+                ownerNames={dogProfile.ownerNames}
+                bio={dogProfile.bio}
+                lifeStory={dogProfile.lifeStory}
+                favoriteSnacks={dogProfile.favoriteSnacks}
                 onUpdate={patch => updateDogProfile(patch)}
                 onNext={goNext}
               />
@@ -287,14 +290,20 @@ function NameStep({
 function DetailsStep({
   breed,
   age,
-  additionalContext,
+  ownerNames,
+  bio,
+  lifeStory,
+  favoriteSnacks,
   onUpdate,
   onNext,
 }: {
   breed: string;
   age: string;
-  additionalContext: string;
-  onUpdate: (patch: { breed?: string; age?: string; additionalContext?: string }) => void;
+  ownerNames: string;
+  bio: string;
+  lifeStory: string;
+  favoriteSnacks: string;
+  onUpdate: (patch: { breed?: string; age?: string; ownerNames?: string; bio?: string; lifeStory?: string; favoriteSnacks?: string }) => void;
   onNext: () => void;
 }) {
   return (
@@ -320,15 +329,44 @@ function DetailsStep({
         placeholderTextColor={COLORS.textMuted}
       />
 
-      <Text style={styles.inputLabel}>Anything else? (optional)</Text>
+      <Text style={styles.inputLabel}>Owner name(s)</Text>
+      <TextInput
+        style={styles.textInput}
+        value={ownerNames}
+        onChangeText={v => onUpdate({ ownerNames: v })}
+        placeholder="Sarah & Tom, the Johnson family..."
+        placeholderTextColor={COLORS.textMuted}
+      />
+
+      <Text style={styles.inputLabel}>Bio (optional)</Text>
       <TextInput
         style={[styles.textInput, styles.textArea]}
-        value={additionalContext}
-        onChangeText={v => onUpdate({ additionalContext: v })}
-        placeholder="Rescue pup, scared of thunderstorms, obsessed with the mail carrier..."
+        value={bio}
+        onChangeText={v => onUpdate({ bio: v })}
+        placeholder="A short intro — rescue pup, scared of thunder, always happy..."
         placeholderTextColor={COLORS.textMuted}
         multiline
         numberOfLines={3}
+      />
+
+      <Text style={styles.inputLabel}>Life story (optional)</Text>
+      <TextInput
+        style={[styles.textInput, styles.textArea]}
+        value={lifeStory}
+        onChangeText={v => onUpdate({ lifeStory: v })}
+        placeholder="Where they came from, how you met, memorable moments..."
+        placeholderTextColor={COLORS.textMuted}
+        multiline
+        numberOfLines={3}
+      />
+
+      <Text style={styles.inputLabel}>Favorite snacks (optional)</Text>
+      <TextInput
+        style={styles.textInput}
+        value={favoriteSnacks}
+        onChangeText={v => onUpdate({ favoriteSnacks: v })}
+        placeholder="Peanut butter, cheese, carrots..."
+        placeholderTextColor={COLORS.textMuted}
       />
 
       <PrimaryButton label="Next →" onPress={onNext} />
@@ -588,10 +626,13 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.sm,
   },
   heading: {
-    fontSize: 28,
-    fontWeight: '800',
+    fontSize: 34,
+    fontFamily: HEADING_FONT_FAMILY,
+    fontWeight: '700',
     color: COLORS.text,
     textAlign: 'center',
+    letterSpacing: -0.6,
+    lineHeight: 40,
   },
   subheading: {
     fontSize: 18,
@@ -613,20 +654,20 @@ const styles = StyleSheet.create({
   },
   primaryBtn: {
     width: '100%',
-    backgroundColor: COLORS.accent,
+    backgroundColor: COLORS.primary,
     paddingVertical: SPACING.md,
-    borderRadius: RADIUS.full,
+    borderRadius: RADIUS.md,
     alignItems: 'center',
     marginTop: SPACING.md,
   },
   primaryBtnDisabled: {
-    opacity: 0.4,
+    opacity: 0.35,
   },
   primaryBtnText: {
-    color: '#000',
+    color: COLORS.textInverse,
     fontSize: 17,
-    fontWeight: '800',
-    letterSpacing: 0.3,
+    fontWeight: '700',
+    letterSpacing: 0.2,
   },
   textInput: {
     width: '100%',

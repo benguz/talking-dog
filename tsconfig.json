@@ -8,5 +8,5 @@
     "noUnusedParameters": false
   },
   "include": ["**/*.ts", "**/*.tsx", "index.js"],
-  "exclude": ["**/node_modules", "**/Pods"]
+  "exclude": ["**/node_modules", "**/Pods", "backend/**"]
 }

@@ -1,9 +1,11 @@
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
+  AppSettings,
   BleStatus,
   ChatMessage,
   CollarTrigger,
+  DEFAULT_APP_SETTINGS,
   DogProfile,
   DogState,
   LLMStatus,
@@ -20,6 +22,7 @@ interface DogStore {
   currentOnboardingStep: OnboardingStep;
   setOnboardingStep: (step: OnboardingStep) => void;
   completeOnboarding: () => void;
+  resetOnboarding: () => void;
 
   // ── Dog Profile ────────────────────────────────────────────
   dogProfile: DogProfile;
@@ -52,6 +55,10 @@ interface DogStore {
   activeTrigger: CollarTrigger | ManualTrigger | null;
   setActiveTrigger: (trigger: CollarTrigger | ManualTrigger | null) => void;
 
+  // ── Developer settings ─────────────────────────────────────
+  settings: AppSettings;
+  updateSettings: (patch: Partial<AppSettings>) => void;
+
   // ── Persistence ────────────────────────────────────────────
   hydrate: () => Promise<void>;
   persist: () => Promise<void>;
@@ -66,6 +73,10 @@ const DEFAULT_DOG_PROFILE: DogProfile = {
   personalityTraits: [],
   voiceStyle: 'bouncy_excited',
   additionalContext: '',
+  ownerNames: '',
+  bio: '',
+  lifeStory: '',
+  favoriteSnacks: '',
 };
 
 export const useDogStore = create<DogStore>((set, get) => ({
@@ -75,6 +86,24 @@ export const useDogStore = create<DogStore>((set, get) => ({
   setOnboardingStep: step => set({ currentOnboardingStep: step }),
   completeOnboarding: () => {
     set({ hasCompletedOnboarding: true });
+    get().persist();
+  },
+  resetOnboarding: () => {
+    set({
+      hasCompletedOnboarding: false,
+      currentOnboardingStep: 'welcome',
+      dogProfile: { ...DEFAULT_DOG_PROFILE },
+      messages: [],
+      settings: { ...DEFAULT_APP_SETTINGS },
+      bleStatus: 'idle',
+      connectedDeviceId: null,
+      collarBattery: null,
+      lastMemsData: null,
+      dogState: 'idle',
+      llmStatus: 'not_loaded',
+      isGenerating: false,
+      activeTrigger: null,
+    });
     get().persist();
   },
 
@@ -112,26 +141,39 @@ export const useDogStore = create<DogStore>((set, get) => ({
   activeTrigger: null,
   setActiveTrigger: trigger => set({ activeTrigger: trigger }),
 
+  // ── Developer settings ──────────────────────────────────────
+  settings: DEFAULT_APP_SETTINGS,
+  updateSettings: patch => {
+    set(s => ({ settings: { ...s.settings, ...patch } }));
+    get().persist();
+  },
+
   // ── Persistence ─────────────────────────────────────────────
   hydrate: async () => {
     try {
       const raw = await AsyncStorage.getItem(STORAGE_KEY);
       if (!raw) return;
       const saved = JSON.parse(raw) as Partial<DogStore>;
+      const settings: AppSettings = { ...DEFAULT_APP_SETTINGS, ...(saved.settings ?? {}) };
+      // The on-device provider is hidden from the UI for now. Coerce any
+      // legacy persisted value back to 'backend' so users who toggled it
+      // before this change aren't stuck on a dead path with no way to switch.
+      if (settings.modelProvider !== 'backend') settings.modelProvider = 'backend';
       set({
         hasCompletedOnboarding: saved.hasCompletedOnboarding ?? false,
         dogProfile: { ...DEFAULT_DOG_PROFILE, ...(saved.dogProfile ?? {}) },
         messages: saved.messages ?? [],
+        settings,
       });
     } catch {
       // ignore parse errors
     }
   },
   persist: async () => {
-    const { hasCompletedOnboarding, dogProfile, messages } = get();
+    const { hasCompletedOnboarding, dogProfile, messages, settings } = get();
     await AsyncStorage.setItem(
       STORAGE_KEY,
-      JSON.stringify({ hasCompletedOnboarding, dogProfile, messages }),
+      JSON.stringify({ hasCompletedOnboarding, dogProfile, messages, settings }),
     );
   },
 }));

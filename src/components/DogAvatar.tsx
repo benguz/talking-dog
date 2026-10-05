@@ -26,8 +26,6 @@ export default function DogAvatar({
   const float = useRef(new Animated.Value(0)).current;
   const bounce = useRef(new Animated.Value(1)).current;
   const shake = useRef(new Animated.Value(0)).current;
-  const ringOpacity = useRef(new Animated.Value(0)).current;
-  const ringScale = useRef(new Animated.Value(0.9)).current;
 
   // ── Animations per state ──────────────────────────────────────────────────
 
@@ -35,10 +33,8 @@ export default function DogAvatar({
     float.stopAnimation();
     bounce.stopAnimation();
     shake.stopAnimation();
-    ringOpacity.stopAnimation();
-    ringScale.stopAnimation();
 
-    if (state === 'idle' || state === 'calm') {
+    if (state === 'idle' || state === 'calm' || state === 'speaking') {
       // Gentle float
       Animated.loop(
         Animated.sequence([
@@ -62,20 +58,6 @@ export default function DogAvatar({
           Animated.timing(bounce, { toValue: 1.12, duration: 200, useNativeDriver: true }),
           Animated.timing(bounce, { toValue: 0.94, duration: 150, useNativeDriver: true }),
           Animated.timing(bounce, { toValue: 1, duration: 100, useNativeDriver: true }),
-        ]),
-      ).start();
-    } else if (state === 'speaking') {
-      // Pulsing ring
-      Animated.loop(
-        Animated.parallel([
-          Animated.sequence([
-            Animated.timing(ringOpacity, { toValue: 0.7, duration: 400, useNativeDriver: true }),
-            Animated.timing(ringOpacity, { toValue: 0, duration: 600, useNativeDriver: true }),
-          ]),
-          Animated.sequence([
-            Animated.timing(ringScale, { toValue: 1.4, duration: 1000, useNativeDriver: true }),
-            Animated.timing(ringScale, { toValue: 0.9, duration: 0, useNativeDriver: true }),
-          ]),
         ]),
       ).start();
     } else if (state === 'sleeping') {
@@ -103,22 +85,7 @@ export default function DogAvatar({
   const imageUri = avatarUri ?? photoUri;
 
   return (
-    <View style={[styles.container, { width: size + 40, height: size + 40 }]}>
-      {/* Speaking ring */}
-      <Animated.View
-        style={[
-          styles.ring,
-          {
-            width: size + 32,
-            height: size + 32,
-            borderRadius: (size + 32) / 2,
-            borderColor: stateColor,
-            opacity: ringOpacity,
-            transform: [{ scale: ringScale }],
-          },
-        ]}
-      />
-
+    <View style={styles.container}>
       <Animated.View
         style={[
           styles.avatarWrapper,
@@ -130,18 +97,10 @@ export default function DogAvatar({
             ],
           },
         ]}>
-        {/* State accent ring */}
-        <View
-          style={[
-            styles.stateRing,
-            { width: size + 8, height: size + 8, borderRadius: (size + 8) / 2, borderColor: stateColor },
-          ]}
-        />
-
         {imageUri ? (
           <Image
             source={{ uri: imageUri }}
-            style={[styles.photo, { width: size, height: size, borderRadius: size / 2 }]}
+            style={[styles.photo, { width: size, height: size, borderRadius: size / 2, borderColor: stateColor }]}
           />
         ) : (
           <View style={[styles.placeholder, { width: size, height: size, borderRadius: size / 2 }]}>
@@ -192,17 +151,10 @@ const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  ring: {
-    position: 'absolute',
-    borderWidth: 3,
+    paddingVertical: 8,
   },
   avatarWrapper: {
     alignItems: 'center',
-  },
-  stateRing: {
-    position: 'absolute',
-    borderWidth: 3,
   },
   photo: {
     borderWidth: 3,

@@ -1,26 +1,25 @@
 /**
  * AudioService — handles:
- *   1. Microphone recording (for future voice input to LLM)
- *   2. TTS playback through phone speaker
- *   3. μ-law encoding for streaming audio to the collar
+ *   1. Local TTS through the phone speaker (on-device model path)
+ *   2. Collar speech: backend TTS → BLE stream
+ *   3. μ-law helpers
+ *
+ * Phone-speaker speech on the backend path plays through the WebRTC Realtime
+ * session, not here.
  *
  * Collar audio pipeline:
  *   llmService.generate() → text → Tts.speak() (phone speaker)
  *                                → μ-law encode → bluetoothService.streamAudio()
  */
 
-import AudioRecorderPlayer, {
-  AudioEncoderAndroidType,
-  AudioSourceAndroidType,
-  AVEncoderAudioQualityIOSType,
-} from 'react-native-audio-recorder-player';
-import type { RecordBackType } from 'react-native-audio-recorder-player';
 import Tts from 'react-native-tts';
 import type { TtsEventHandler } from 'react-native-tts';
 import { Platform } from 'react-native';
+import { bluetoothService, AUDIO_SAMPLE_RATE } from './BluetoothService';
+import type { CollarAudioFormat } from './BluetoothService';
+import { fetchBackendTts } from './LLMService';
 
 class AudioService {
-  private isRecording = false;
   private isTtsInitialized = false;
 
   // ── TTS ───────────────────────────────────────────────────────────────────
@@ -28,7 +27,7 @@ class AudioService {
   async initTts(voiceRate: number = 0.5, voicePitch: number = 1.1): Promise<void> {
     if (this.isTtsInitialized) return;
     await Tts.getInitStatus();
-    Tts.setDefaultRate(voiceRate);
+    Tts.setDefaultRate(voiceRate, false);
     Tts.setDefaultPitch(voicePitch);
     if (Platform.OS === 'ios') {
       Tts.setDefaultLanguage('en-US');
@@ -43,7 +42,7 @@ class AudioService {
    */
   speak(text: string): Promise<void> {
     return new Promise((resolve, reject) => {
-      Tts.stop();
+      Tts.stop(false);
 
       const onFinish: TtsEventHandler<'tts-finish'> = () => {
         Tts.removeEventListener('tts-finish', onFinish);
@@ -72,36 +71,58 @@ class AudioService {
   }
 
   stopSpeaking() {
-    Tts.stop();
+    Tts.stop(false);
   }
 
-  // ── Microphone recording ──────────────────────────────────────────────────
-
-  async startRecording(): Promise<void> {
-    if (this.isRecording) return;
-    this.isRecording = true;
-    await AudioRecorderPlayer.startRecorder(undefined, {
-      AVSampleRateKeyIOS: 8000,
-      AVNumberOfChannelsKeyIOS: 1,
-      AVEncoderAudioQualityKeyIOS: AVEncoderAudioQualityIOSType.low,
-      AVFormatIDKeyIOS: 'lpcm',
-      AudioSourceAndroid: AudioSourceAndroidType.MIC,
-      AudioEncoderAndroid: AudioEncoderAndroidType.AAC,
-    });
+  /**
+   * Speak `text` through the collar's speaker: the backend synthesizes it
+   * straight to 8 kHz μ-law (POST /v1/tts with format: 'ulaw8k') and we
+   * forward the bytes over BLE. Resolves when the collar has finished playing.
+   */
+  async streamToCollar(
+    text: string,
+    opts: { backendUrl?: string; voiceStyle?: string } = {},
+  ): Promise<void> {
+    if (!bluetoothService.isConnected) {
+      console.warn('[Audio] streamToCollar: collar not connected; dropping audio');
+      return;
+    }
+    const clip = await AudioService.fetchCollarSpeech(text, opts);
+    await bluetoothService.streamAudio(clip.bytes, { waitForPlayback: true, format: clip.format });
   }
 
-  async stopRecording(): Promise<string> {
-    if (!this.isRecording) return '';
-    this.isRecording = false;
-    const path = await AudioRecorderPlayer.stopRecorder();
-    AudioRecorderPlayer.removeRecordBackListener();
-    return path;
+  /** Collar speech format: 16 kHz IMA ADPCM (wideband, 8 kB/s). 'ulaw8k' is the fallback. */
+  static readonly COLLAR_FORMAT: CollarAudioFormat = 'adpcm16k';
+
+  /** Synthesize `text` for the collar via the backend (no BLE involved). */
+  static async fetchCollarSpeech(
+    text: string,
+    opts: { backendUrl?: string; voiceStyle?: string } = {},
+  ): Promise<{ bytes: Uint8Array; format: CollarAudioFormat }> {
+    const t0 = Date.now();
+    const format = AudioService.COLLAR_FORMAT;
+    const res = await fetchBackendTts(opts.backendUrl ?? '', text, opts.voiceStyle ?? 'bouncy_excited', format);
+    if (!res.ok) {
+      throw new Error(`collar TTS request failed: ${res.status} ${await res.text().catch(() => '')}`);
+    }
+    // Guard against a backend that doesn't know this format yet (it would fall
+    // back to MP3, which the collar would play as noise).
+    const expectedType = format === 'adpcm16k' ? 'audio/x-adpcm' : 'audio/basic';
+    const contentType = res.headers.get('Content-Type') ?? '';
+    if (!contentType.startsWith(expectedType)) {
+      throw new Error(
+        `collar TTS returned ${contentType || 'unknown'} instead of ${expectedType} — deploy the backend (wrangler deploy)`,
+      );
+    }
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    console.log(`[Audio] collar TTS (${format}): "${text.slice(0, 40)}…" ${(bytes.length / 8000).toFixed(1)} s in ${Date.now() - t0} ms`);
+    return { bytes, format };
   }
 
-  onRecordingProgress(cb: (dBFS: number) => void) {
-    AudioRecorderPlayer.addRecordBackListener((e: RecordBackType) => {
-      cb(e.currentMetering ?? -60);
-    });
+  /** Dev: stream a synthetic tone to the collar (no backend needed). */
+  async streamTestToneToCollar(text: string): Promise<void> {
+    if (!bluetoothService.isConnected) return;
+    await bluetoothService.streamAudio(AudioService.encodeUlaw(synthesizePlaceholderPcm(text)));
   }
 
   // ── μ-law encoding ────────────────────────────────────────────────────────
@@ -147,6 +168,27 @@ class AudioService {
     }
     return pcm;
   }
+}
+
+/**
+ * Generate a simple amplitude-modulated tone whose duration scales with the
+ * input text. Output is 16-bit linear PCM @ AUDIO_SAMPLE_RATE Hz, mono.
+ */
+function synthesizePlaceholderPcm(text: string): Int16Array {
+  const charsPerSecond = 14;
+  const seconds = Math.min(4, Math.max(0.4, text.length / charsPerSecond));
+  const totalSamples = Math.floor(seconds * AUDIO_SAMPLE_RATE);
+  const carrierHz = 380;
+  const modulatorHz = 5;
+  const pcm = new Int16Array(totalSamples);
+  const twoPi = Math.PI * 2;
+  for (let i = 0; i < totalSamples; i++) {
+    const t = i / AUDIO_SAMPLE_RATE;
+    const envelope = 0.5 + 0.5 * Math.sin(twoPi * modulatorHz * t);
+    const sample = Math.sin(twoPi * carrierHz * t) * envelope * 0.6;
+    pcm[i] = Math.max(-32767, Math.min(32767, Math.round(sample * 32767)));
+  }
+  return pcm;
 }
 
 export const audioService = new AudioService();

@@ -11,12 +11,14 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { launchImageLibrary } from 'react-native-image-picker';
+import Icon from 'react-native-vector-icons/Feather';
 import { useDogStore } from '../store/dogStore';
 import { useBluetooth } from '../hooks/useBluetooth';
-import { COLORS, RADIUS, SPACING } from '../components/theme';
+import { COLORS, HEADING_FONT_FAMILY, RADIUS, SPACING } from '../components/theme';
 import {
   DogPersonalityTrait,
   DogVoiceStyle,
+  ModelProvider,
   VOICE_STYLE_DESCRIPTIONS,
 } from '../types';
 
@@ -42,11 +44,20 @@ const VOICE_OPTIONS: Array<{ id: DogVoiceStyle; emoji: string }> = [
 ];
 
 export default function ProfileScreen() {
-  const { dogProfile, updateDogProfile, bleStatus, llmStatus, clearMessages } = useDogStore();
+  const {
+    dogProfile,
+    updateDogProfile,
+    bleStatus,
+    llmStatus,
+    clearMessages,
+    settings,
+  } = useDogStore();
   const { startScan, disconnect } = useBluetooth();
   const [expanded, setExpanded] = useState<string | null>('identity');
 
   const isConnected = bleStatus === 'connected';
+  const modelLabel = MODEL_LABELS[settings.modelProvider];
+  const modelStatusText = describeModelStatus(llmStatus, settings.modelProvider);
 
   const handlePickPhoto = () => {
     launchImageLibrary({ mediaType: 'photo', quality: 0.8 }, res => {
@@ -66,23 +77,27 @@ export default function ProfileScreen() {
         <Text style={styles.title}>My Dog</Text>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
 
         {/* Avatar */}
-        <Pressable onPress={handlePickPhoto} style={styles.avatarSection}>
-          {dogProfile.photoUri ? (
-            <Image source={{ uri: dogProfile.photoUri }} style={styles.photo} />
-          ) : (
-            <View style={styles.photoPlaceholder}>
-              <Text style={styles.photoEmoji}>🐾</Text>
+        <View style={styles.avatarSection}>
+          <Pressable onPress={handlePickPhoto} style={styles.photoWrapper}>
+            <View style={styles.photoCircle}>
+              {dogProfile.photoUri ? (
+                <Image source={{ uri: dogProfile.photoUri }} style={styles.photo} />
+              ) : (
+                <View style={styles.photoPlaceholder}>
+                  <Text style={styles.photoEmoji}>🐾</Text>
+                </View>
+              )}
             </View>
-          )}
-          <View style={styles.editBadge}>
-            <Text style={styles.editBadgeText}>Edit photo</Text>
-          </View>
+            <View style={styles.editBadge}>
+              <Icon name="edit-2" size={12} color="#fff" />
+            </View>
+          </Pressable>
           <Text style={styles.dogName}>{dogProfile.name || 'Your dog'}</Text>
           <Text style={styles.dogBreed}>{dogProfile.breed || 'Unknown breed'} · {dogProfile.age || '?'}</Text>
-        </Pressable>
+        </View>
 
         {/* Collar status card */}
         <SectionCard>
@@ -103,17 +118,13 @@ export default function ProfileScreen() {
           </View>
         </SectionCard>
 
-        {/* AI model status */}
+        {/* AI status */}
         <SectionCard>
           <View style={styles.collarRow}>
             <View style={{ flex: 1 }}>
-              <Text style={styles.sectionTitle}>AI Model</Text>
+              <Text style={styles.sectionTitle}>AI</Text>
               <Text style={styles.sectionSubtitle}>
-                {llmStatus === 'ready'
-                  ? '✅ Loaded and ready'
-                  : llmStatus === 'loading'
-                  ? '⏳ Loading...'
-                  : '⚠️  Not loaded — drop a GGUF model into Documents/'}
+                {modelLabel} · {modelStatusText}
               </Text>
             </View>
           </View>
@@ -148,14 +159,39 @@ export default function ProfileScreen() {
             placeholder="2 years, 8 months..."
             placeholderTextColor={COLORS.textMuted}
           />
-          <Text style={styles.fieldLabel}>Notes</Text>
+          <Text style={styles.fieldLabel}>Owner name(s)</Text>
+          <TextInput
+            style={styles.input}
+            value={dogProfile.ownerNames}
+            onChangeText={v => updateDogProfile({ ownerNames: v })}
+            placeholder="Sarah & Tom, the Johnson family..."
+            placeholderTextColor={COLORS.textMuted}
+          />
+          <Text style={styles.fieldLabel}>Bio</Text>
           <TextInput
             style={[styles.input, styles.textArea]}
-            value={dogProfile.additionalContext}
-            onChangeText={v => updateDogProfile({ additionalContext: v })}
-            placeholder="Rescue pup, scared of thunderstorms..."
+            value={dogProfile.bio}
+            onChangeText={v => updateDogProfile({ bio: v })}
+            placeholder="A short intro — rescue pup, scared of thunder, always happy..."
             placeholderTextColor={COLORS.textMuted}
             multiline
+          />
+          <Text style={styles.fieldLabel}>Life Story</Text>
+          <TextInput
+            style={[styles.input, styles.textArea]}
+            value={dogProfile.lifeStory}
+            onChangeText={v => updateDogProfile({ lifeStory: v })}
+            placeholder="Where they came from, how you met, memorable moments..."
+            placeholderTextColor={COLORS.textMuted}
+            multiline
+          />
+          <Text style={styles.fieldLabel}>Favorite Snacks</Text>
+          <TextInput
+            style={styles.input}
+            value={dogProfile.favoriteSnacks}
+            onChangeText={v => updateDogProfile({ favoriteSnacks: v })}
+            placeholder="Peanut butter, cheese, carrots..."
+            placeholderTextColor={COLORS.textMuted}
           />
         </AccordionSection>
 
@@ -242,6 +278,22 @@ function SectionCard({ children }: { children: React.ReactNode }) {
   return <View style={styles.card}>{children}</View>;
 }
 
+const MODEL_LABELS: Record<ModelProvider, string> = {
+  backend: 'Cloud AI',
+  on_device: 'On-device AI',
+};
+
+function describeModelStatus(status: string, provider: ModelProvider): string {
+  if (status === 'ready') return 'ready';
+  if (status === 'loading') return provider === 'on_device' ? 'loading model…' : 'connecting…';
+  if (status === 'generating') return 'thinking…';
+  if (status === 'error') return 'error';
+  if (status === 'not_loaded') {
+    return provider === 'on_device' ? 'no local model installed' : 'offline';
+  }
+  return status;
+}
+
 function AccordionSection({
   title,
   expanded,
@@ -271,22 +323,37 @@ const styles = StyleSheet.create({
     paddingTop: SPACING.md,
     paddingBottom: SPACING.sm,
   },
-  title: { fontSize: 24, fontWeight: '800', color: COLORS.text },
+  title: {
+    fontSize: 28,
+    fontFamily: HEADING_FONT_FAMILY,
+    fontWeight: '700',
+    color: COLORS.text,
+    letterSpacing: -0.4,
+  },
+  scrollView: { flex: 1 },
   scroll: { padding: SPACING.lg, gap: SPACING.md, paddingBottom: SPACING.xxl },
   avatarSection: { alignItems: 'center', gap: SPACING.sm, marginBottom: SPACING.sm },
-  photo: { width: 100, height: 100, borderRadius: 50, borderWidth: 3, borderColor: COLORS.accent },
+  photoWrapper: { width: 108, height: 108, position: 'relative' },
+  photoCircle: {
+    width: 102, height: 102, borderRadius: 51,
+    borderWidth: 3, borderColor: COLORS.accent,
+    overflow: 'hidden',
+    margin: 3,
+  },
+  photo: { width: '100%', height: '100%' },
   photoPlaceholder: {
-    width: 100, height: 100, borderRadius: 50,
+    flex: 1,
     backgroundColor: COLORS.surfaceElevated,
     alignItems: 'center', justifyContent: 'center',
-    borderWidth: 2, borderColor: COLORS.border,
   },
   photoEmoji: { fontSize: 44 },
   editBadge: {
-    backgroundColor: COLORS.accentSoft, borderRadius: RADIUS.full,
-    paddingHorizontal: SPACING.sm, paddingVertical: 3,
+    position: 'absolute', top: 0, right: 0,
+    width: 28, height: 28, borderRadius: 14,
+    backgroundColor: COLORS.accent,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 2, borderColor: COLORS.background,
   },
-  editBadgeText: { fontSize: 12, color: COLORS.accent, fontWeight: '600' },
   dogName: { fontSize: 22, fontWeight: '800', color: COLORS.text },
   dogBreed: { fontSize: 14, color: COLORS.textMuted },
   card: {

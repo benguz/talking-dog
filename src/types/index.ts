@@ -1,12 +1,16 @@
 // ─── BLE / Collar ────────────────────────────────────────────────────────────
 
-export const COLLAR_SERVICE_UUID = '12345678-1234-5678-1234-56789abcdef0';
+export const COLLAR_SERVICE_UUID = '12345678-1234-1234-1234-1234567890AB';
 export const CHAR_MEMS_DATA = '12345678-1234-5678-1234-56789abcdef1'; // notify: MPU-6050 packets
 export const CHAR_AUDIO_TX = '12345678-1234-5678-1234-56789abcdef2'; // write: audio chunks → collar speaker
 export const CHAR_TRIGGER = '12345678-1234-5678-1234-56789abcdef3'; // notify: collar → phone trigger events
 export const CHAR_STATUS = '12345678-1234-5678-1234-56789abcdef4'; // read/notify: collar status
+/** notify: chunked JPEG stream — see BLE camera protocol in collar.ino */
+export const CHAR_CAMERA = '12345678-1234-5678-1234-56789abcdef5';
+/** notify: collar microphone, [seqHi, seqLo, ...8 kHz μ-law] per 20 ms (XIAO nRF54L15 collar) */
+export const CHAR_MIC = '12345678-1234-5678-1234-56789abcdef6';
 
-export const COLLAR_NAME_PREFIX = 'TalkingDog';
+export const COLLAR_NAME_PREFIX = 'DogCollarTest';
 
 /** Trigger codes the collar sends to the phone (uint8) */
 export enum CollarTrigger {
@@ -77,6 +81,8 @@ export enum ManualTrigger {
   WHATS_UP = 'WHATS_UP',
   GOOD_DOG = 'GOOD_DOG',
   WHATS_WRONG = 'WHATS_WRONG',
+  /** User typed a custom message — dog should respond to the conversation. */
+  CUSTOM_TEXT = 'CUSTOM_TEXT',
 }
 
 export const MANUAL_TRIGGER_PROMPTS: Record<ManualTrigger, string> = {
@@ -85,6 +91,7 @@ export const MANUAL_TRIGGER_PROMPTS: Record<ManualTrigger, string> = {
   [ManualTrigger.WHATS_UP]: "The human is checking in and asking what's up with you",
   [ManualTrigger.GOOD_DOG]: 'The human just told you that you are a good dog',
   [ManualTrigger.WHATS_WRONG]: 'The human is worried and asking if something is wrong',
+  [ManualTrigger.CUSTOM_TEXT]: 'The human just sent you a message. Read the conversation and respond naturally to what they said.',
 };
 
 // ─── Dog Profile ──────────────────────────────────────────────────────────────
@@ -124,7 +131,11 @@ export interface DogProfile {
   avatarUri: string | null; // AI-generated illustrated avatar
   personalityTraits: DogPersonalityTrait[];
   voiceStyle: DogVoiceStyle;
-  additionalContext: string; // free-form notes about the dog
+  additionalContext: string; // kept for backward compat
+  ownerNames: string;
+  bio: string;
+  lifeStory: string;
+  favoriteSnacks: string;
 }
 
 export type OnboardingStep =
@@ -138,3 +149,53 @@ export type OnboardingStep =
   | 'done';
 
 export type DogState = 'idle' | 'wagging' | 'excited' | 'sleeping' | 'alert' | 'speaking' | 'calm';
+
+// ─── Developer Settings ──────────────────────────────────────────────────────
+
+/** Where dog speech audio is routed when the LLM responds. */
+export type AudioOutput = 'phone' | 'collar';
+
+/** Where vision frames come from for the LLM (future-facing). */
+export type CameraSource = 'phone' | 'collar';
+
+/**
+ * Which LLM backend services dog responses.
+ *  - `backend`: hosted API behind our own server (default for users)
+ *  - `on_device`: tiny model running locally via llama.rn
+ */
+export type ModelProvider = 'backend' | 'on_device';
+
+export interface AppSettings {
+  audioOutput: AudioOutput;
+  cameraSource: CameraSource;
+  /** When true, camera is used to capture a photo before/during LLM responses. */
+  cameraEnabled: boolean;
+  /** When true, fake a connected collar without scanning real BLE — useful in the iOS simulator. */
+  simulateCollar: boolean;
+  modelProvider: ModelProvider;
+  /** Override URL for the hosted LLM backend. Empty string falls back to the compile-time default. */
+  backendUrl: string;
+  /** When true (and a collar with a mic is connected), speech heard by the collar is transcribed and sent to the chat. */
+  collarMicInput: boolean;
+  /** When true, motion events from the collar (wag, excited, sleeping…) make the dog speak on its own. */
+  collarTriggersEnabled: boolean;
+  /** Minimum seconds between self-initiated (motion-triggered) dog responses. */
+  collarTriggerCooldownSec: number;
+  /** Live phone video: preview fills the Talk screen and 3 frames from the last 5 s go with every message. */
+  liveVideoEnabled: boolean;
+  liveVideoCamera: 'back' | 'front';
+}
+
+export const DEFAULT_APP_SETTINGS: AppSettings = {
+  audioOutput: 'phone',
+  cameraSource: 'phone',
+  cameraEnabled: false,
+  simulateCollar: false,
+  modelProvider: 'backend',
+  backendUrl: '',
+  collarMicInput: true,
+  collarTriggersEnabled: true,
+  collarTriggerCooldownSec: 60,
+  liveVideoEnabled: false,
+  liveVideoCamera: 'back',
+};

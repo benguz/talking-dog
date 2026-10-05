@@ -1,59 +1,76 @@
+import { Platform } from 'react-native';
+
+/**
+ * Light, friendly palette inspired by thanksmerlin.com:
+ * cream background, white surfaces, black primary CTAs, subtle
+ * black-tinted borders, with a warm amber accent for dog moments.
+ */
 export const COLORS = {
-  // Dark warm background
-  background: '#0F0D12',
-  surface: '#1A1621',
-  surfaceElevated: '#221E2E',
-  border: '#2E2840',
+  // Cream canvas + white cards
+  background: '#FAF9F6',
+  surface: '#FFFFFF',
+  surfaceElevated: '#F4F2ED',
+  border: 'rgba(0, 0, 0, 0.10)',
+  borderStrong: 'rgba(0, 0, 0, 0.18)',
 
-  // Accent — warm amber/golden
-  accent: '#F5A623',
-  accentSoft: '#F5A62330',
-  accentDark: '#C07800',
+  // Warm amber for selection / dog accents
+  accent: '#E07B00',
+  accentSoft: 'rgba(224, 123, 0, 0.10)',
+  accentDark: '#A85A00',
 
-  // Paw purple
-  primary: '#8B5CF6',
-  primarySoft: '#8B5CF620',
+  // Black is the primary (matches thanksmerlin CTA buttons)
+  primary: '#0A0A0A',
+  primarySoft: 'rgba(0, 0, 0, 0.06)',
 
-  // Text
-  text: '#F5F0FF',
-  textSecondary: '#B8AFCC',
-  textMuted: '#6B6480',
+  // Text — black with opacity ramps
+  text: '#0A0A0A',
+  textSecondary: 'rgba(0, 0, 0, 0.72)',
+  textMuted: 'rgba(0, 0, 0, 0.50)',
+  textInverse: '#FFFFFF',
 
   // Status
-  success: '#4ADE80',
-  warning: '#FBBF24',
-  error: '#F87171',
-  info: '#60A5FA',
+  success: '#16A34A',
+  warning: '#D97706',
+  error: '#DC2626',
+  info: '#2563EB',
 
-  // Dog state colors
-  wagging: '#F59E0B',
-  excited: '#EF4444',
-  sleeping: '#6366F1',
-  alert: '#F97316',
-  calm: '#34D399',
-  speaking: '#8B5CF6',
+  // Dog state colors (tuned for light bg)
+  wagging: '#E07B00',
+  excited: '#DC2626',
+  sleeping: '#4F46E5',
+  alert: '#EA580C',
+  calm: '#059669',
+  speaking: '#0A0A0A',
 };
+
+const HEADING_FAMILY = Platform.select({
+  ios: 'Georgia',
+  android: 'serif',
+  default: 'Georgia',
+});
 
 export const FONTS = {
   heading: {
-    fontFamily: 'System',
-    fontWeight: '800' as const,
+    fontFamily: HEADING_FAMILY,
+    fontWeight: '700' as const,
   },
   body: {
-    fontFamily: 'System',
+    fontFamily: undefined,
     fontWeight: '400' as const,
   },
   medium: {
-    fontFamily: 'System',
+    fontFamily: undefined,
     fontWeight: '600' as const,
   },
 };
 
+export const HEADING_FONT_FAMILY = HEADING_FAMILY;
+
 export const RADIUS = {
   sm: 8,
-  md: 14,
-  lg: 20,
-  xl: 28,
+  md: 12,
+  lg: 16,
+  xl: 24,
   full: 999,
 };
 

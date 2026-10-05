@@ -1,0 +1,53 @@
+/*
+ * Talking Dog collar — XIAO nRF54L15 pin map
+ *
+ *   I2S20 → MAX98357A     (I2S20 lives in the PERI domain, so it must use P1 pins;
+ *                          D8–D10 are P2 and cannot be used for I2S)
+ *     D0  P1.04  BCLK
+ *     D1  P1.05  LRC / WS
+ *     D2  P1.06  DIN
+ *
+ *   I2C22 → MPU-6050      (board default, "xiao_i2c")
+ *     D4  P1.10  SDA
+ *     D5  P1.11  SCL
+ *
+ *   PDM20 → onboard mic   (XIAO nRF54L15 Sense only; P1.12 CLK, P1.13 DIN)
+ */
+
+&pinctrl {
+	i2s20_default: i2s20_default {
+		group1 {
+			psels = <NRF_PSEL(I2S_SCK_M, 1, 4)>,
+				<NRF_PSEL(I2S_LRCK_M, 1, 5)>,
+				<NRF_PSEL(I2S_SDOUT, 1, 6)>;
+		};
+	};
+
+	i2s20_sleep: i2s20_sleep {
+		group1 {
+			psels = <NRF_PSEL(I2S_SCK_M, 1, 4)>,
+				<NRF_PSEL(I2S_LRCK_M, 1, 5)>,
+				<NRF_PSEL(I2S_SDOUT, 1, 6)>;
+			low-power-enable;
+		};
+	};
+};
+
+&i2s20 {
+	status = "okay";
+	pinctrl-0 = <&i2s20_default>;
+	pinctrl-1 = <&i2s20_sleep>;
+	pinctrl-names = "default", "sleep";
+	clock-source = "PCLK32M";
+};
+
+/* MPU-6050 is driven with raw I2C transfers from imu.c; no Zephyr sensor driver. */
+&i2c22 {
+	status = "okay";
+	clock-frequency = <I2C_BITRATE_FAST>;
+};
+
+/* Sense-only onboard LSM6DS3 — we use the external MPU-6050 instead. */
+&lsm6ds3tr_c {
+	status = "disabled";
+};

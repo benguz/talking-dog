@@ -6,6 +6,7 @@ import { useDogStore } from '../store/dogStore';
 import OnboardingScreen from '../screens/OnboardingScreen';
 import HomeScreen from '../screens/HomeScreen';
 import ProfileScreen from '../screens/ProfileScreen';
+import SettingsScreen from '../screens/SettingsScreen';
 import { View, Text, StyleSheet } from 'react-native';
 import { COLORS } from '../components/theme';
 
@@ -17,6 +18,7 @@ export type RootStackParamList = {
 export type MainTabParamList = {
   Home: undefined;
   Profile: undefined;
+  Settings: undefined;
 };
 
 const Stack = createStackNavigator<RootStackParamList>();
@@ -46,6 +48,14 @@ function MainTabs() {
         options={{
           tabBarIcon: ({ color }) => <TabIcon label="🐶" color={color} />,
           tabBarLabel: 'My Dog',
+        }}
+      />
+      <Tab.Screen
+        name="Settings"
+        component={SettingsScreen}
+        options={{
+          tabBarIcon: ({ color }) => <TabIcon label="⚙️" color={color} />,
+          tabBarLabel: 'Settings',
         }}
       />
     </Tab.Navigator>

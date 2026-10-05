@@ -5,8 +5,19 @@ require Pod::Executable.execute_command('node', ['-p',
     {paths: [process.argv[1]]},
   )', __dir__]).strip
 
+# react-native-permissions v5 setup helper
+require_relative '../node_modules/react-native-permissions/scripts/setup'
+
 platform :ios, min_ios_version_supported
 prepare_react_native_project!
+
+# Declare only the permissions the app actually uses
+setup_permissions([
+  'Bluetooth',
+  'Camera',
+  'Microphone',
+  'PhotoLibrary',
+])
 
 linkage = ENV['USE_FRAMEWORKS']
 if linkage != nil
@@ -17,12 +28,8 @@ end
 target 'TalkingDog' do
   config = use_native_modules!
 
-  # react-native-permissions: declare only the permissions you actually use
-  permissions_path = '../node_modules/react-native-permissions/ios'
-  pod 'Permission-Bluetooth', :path => "#{permissions_path}/Bluetooth"
-  pod 'Permission-Microphone', :path => "#{permissions_path}/Microphone"
-  pod 'Permission-Camera', :path => "#{permissions_path}/Camera"
-  pod 'Permission-PhotoLibrary', :path => "#{permissions_path}/PhotoLibrary"
+  # react-native-audio-recorder-player v4 (Nitro) requires NitroModules
+  pod 'NitroModules', :path => '../node_modules/react-native-nitro-modules'
 
   use_react_native!(
     :path => config[:reactNativePath],
@@ -31,6 +38,44 @@ target 'TalkingDog' do
   )
 
   post_install do |installer|
+    # react-native-reanimated v3 assigns to RCTRootView.intrinsicContentSize which
+    # is readonly in RN 0.73+ (new arch). Patch the source before compilation.
+    rea_swizzled = "#{Pod::Config.instance.installation_root}/../node_modules/react-native-reanimated/apple/reanimated/apple/LayoutReanimation/REASwizzledUIManager.mm"
+    if File.exist?(rea_swizzled)
+      contents = File.read(rea_swizzled)
+      patched = contents.gsub(
+        'rootView.intrinsicContentSize = contentSize;',
+        '// intrinsicContentSize is readonly in RN 0.73+ (new arch) — no-op (void)contentSize;'
+      )
+      File.write(rea_swizzled, patched) if patched != contents
+    end
+
+    # scrollToOffset:animated: was removed from RCTScrollView in new arch.
+    # Patch to use the inner UIScrollView's setContentOffset:animated: instead.
+    rea_native_methods = "#{Pod::Config.instance.installation_root}/../node_modules/react-native-reanimated/apple/reanimated/apple/native/NativeMethods.mm"
+    if File.exist?(rea_native_methods)
+      contents = File.read(rea_native_methods)
+      patched = contents.gsub(
+        "RCTScrollView *scrollView = (RCTScrollView *)view;\n  [scrollView scrollToOffset:(CGPoint){(CGFloat)x, (CGFloat)y} animated:animated];",
+        "if ([view isKindOfClass:[RCTScrollView class]]) {\n    RCTScrollView *rctScrollView = (RCTScrollView *)view;\n    [rctScrollView.scrollView setContentOffset:CGPointMake((CGFloat)x, (CGFloat)y) animated:animated];\n  } else if ([view isKindOfClass:[UIScrollView class]]) {\n    [(UIScrollView *)view setContentOffset:CGPointMake((CGFloat)x, (CGFloat)y) animated:animated];\n  }"
+      )
+      File.write(rea_native_methods, patched) if patched != contents
+    end
+
+    # react-native-reanimated v3 sets HERMES_ENABLE_DEBUGGER=1 in its xcconfig,
+    # which pulls in hermes/inspector/RuntimeAdapter.h — a header removed in the
+    # modern Hermes CDP rewrite shipped with React Native 0.84. Disable it for
+    # the reanimated pod so the broken include chain is never reached.
+    # This only affects debugger registration for the worklet runtime,
+    # not the main JS runtime's debug capability.
+    %w[debug release].each do |variant|
+      xcconfig_path = "#{installer.sandbox.root}/Target Support Files/RNReanimated/RNReanimated.#{variant}.xcconfig"
+      next unless File.exist?(xcconfig_path)
+      contents = File.read(xcconfig_path)
+      patched  = contents.gsub('HERMES_ENABLE_DEBUGGER=1', 'HERMES_ENABLE_DEBUGGER=0')
+      File.write(xcconfig_path, patched) if patched != contents
+    end
+
     react_native_post_install(
       installer,
       config[:reactNativePath],

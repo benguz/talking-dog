@@ -73,3 +73,13 @@ yarn-error.log
 !.yarn/releases
 !.yarn/sdks
 !.yarn/versions
+.dev.vars
+backend/node_modules
+backend/.wrangler
+
+# scratch / local test assets
+temp/
+_AppIcons_import/
+*.wav
+firmware/**/.pio/
+firmware/**/.vscode/

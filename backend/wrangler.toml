@@ -1,0 +1,41 @@
+name = "talking-dog-worker"
+main = "src/index.ts"
+compatibility_date = "2025-05-01"
+compatibility_flags = ["nodejs_compat"]
+
+account_id = "b8903cc6f23020dfc31d61917e2ac0da"
+
+[ai]
+binding = "AI"
+
+# Create the KV namespace first:
+#   wrangler kv namespace create APP_ATTEST_KV
+#   wrangler kv namespace create APP_ATTEST_KV --preview
+# Then fill in the ids below.
+[[kv_namespaces]]
+binding = "APP_ATTEST_KV"
+id = "0551569debf3493993c36d9dff19f00d"
+preview_id = "4f7d597004dd41a0b70d9cac56051bc3"
+
+[vars]
+MODEL_NAME = "gpt-6-luna"
+# Reasoning is off for speed; set to "low" if the dog gets too dim.
+REASONING_EFFORT = "none"
+# Collar voice: ElevenLabs Eleven v4 Turbo (needs `wrangler secret put ELEVENLABS_API_KEY`).
+# ELEVENLABS_VOICE is a name from your voice library; set ELEVENLABS_VOICE_ID to pin one.
+TTS_PROVIDER = "elevenlabs"
+ELEVENLABS_MODEL = "eleven_v4_turbo"
+ELEVENLABS_VOICE_ID = "4e32WqNVWRquDa1OcRYZ"
+ELEVENLABS_STABILITY = "0.35"
+APPLE_TEAM_ID = "N6QXM824ZR"
+APPLE_BUNDLE_ID = "com.benguzovsky.TalkingDog"
+# Set to "true" in production to hard-reject requests without App Attest
+REQUIRE_ATTEST = "false"
+
+# Secrets — set via wrangler secret put, never commit values:
+#   wrangler secret put OPENAI_API_KEY
+#   wrangler secret put ELEVENLABS_API_KEY
+
+[observability.logs]
+enabled = true
+invocation_logs = true
