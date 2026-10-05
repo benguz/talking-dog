@@ -42,8 +42,8 @@
 #define SPK_BLOCK_BYTES     (SPK_BLOCK_FRAMES * 2 /*ch*/ * 2 /*bytes*/)
 #define SPK_BLOCK_COUNT     8
 #define SPK_GAIN_SHIFT      0        /* legacy attenuation: 0 = none, 1 = -6 dB */
-#define SPK_GAIN_X10        25       /* digital gain ×0.1 before the limiter: 25 = ×2.5 (+8 dB) */
-#define SPK_LIMIT_KNEE      20000    /* soft-clip above this (of 32767) so peaks round off instead of crunching */
+#define SPK_GAIN_X10        15       /* digital gain ×0.1 before the limiter: 15 = ×1.5 (+3.5 dB) */
+#define SPK_LIMIT_KNEE      24000    /* soft-clip above this (of 32767) so peaks round off instead of crunching */
 #define AUDIO_RX_RING_BYTES 65536    /* ~8 s at 8 kB/s (8 kHz μ-law or 16 kHz ADPCM) */
 #define AUDIO_PREBUFFER     1600     /* start playback once 200 ms has arrived */
 #define AUDIO_KEEPALIVE_MS  1500     /* keep I2S running (silence) this long between clips */

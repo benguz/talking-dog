@@ -100,9 +100,40 @@ class BluetoothService {
 
   // ── Scanning ────────────────────────────────────────────────────────────────
 
+  /**
+   * Resolve once the adapter is PoweredOn, or reject with a human-readable
+   * reason. Android 12+ reports "PoweredOff" to apps lacking the Nearby
+   * devices (BLUETOOTH_CONNECT) permission, so say so.
+   */
+  private async waitForPoweredOn(timeoutMs = 4000): Promise<void> {
+    const state = await this.manager.state();
+    if (state === 'PoweredOn') return;
+    console.log('[BLE] adapter state:', state, '— waiting');
+    await new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        sub.remove();
+        const hint =
+          state === 'Unauthorized'
+            ? 'Bluetooth permission denied — allow "Nearby devices" for TalkingDog in Settings.'
+            : state === 'Unsupported'
+              ? 'This device has no Bluetooth LE.'
+              : 'Bluetooth is off — turn it on (or allow "Nearby devices" for TalkingDog on Android).';
+        reject(new Error(hint));
+      }, timeoutMs);
+      const sub = this.manager.onStateChange(s => {
+        if (s === 'PoweredOn') {
+          clearTimeout(timer);
+          sub.remove();
+          resolve();
+        }
+      }, true);
+    });
+  }
+
   async scanAndConnect(
     onDeviceFound?: (name: string) => void,
   ): Promise<Device> {
+    await this.waitForPoweredOn();
     console.log(`[BLE] startDeviceScan — service filter: ${COLLAR_SERVICE_UUID}`);
     return new Promise((resolve, reject) => {
       this.manager.startDeviceScan(

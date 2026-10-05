@@ -22,6 +22,8 @@ export interface Env {
   ELEVENLABS_MODEL?: string;
   /** 0..1, lower = more expressive (default 0.35) */
   ELEVENLABS_STABILITY?: string;
+  /** 'off' disables the speech compressor on the collar path */
+  COLLAR_COMPRESS?: string;
   /** Set to "true" in production to hard-reject unatested requests */
   REQUIRE_ATTEST?: string;
 }

@@ -158,9 +158,14 @@ export function useBluetooth({ onTrigger, onMems }: UseBluetoothOptions = {}) {
         console.log('[BLE] XIAO collar connected — switching audio output to collar');
         updateSettings({ audioOutput: 'collar' });
       }
-    } catch {
+    } catch (e) {
       clearTimeout(timeoutId);
       setBleStatus('error');
+      const msg = e instanceof Error ? e.message : String(e);
+      console.warn('[BLE] connect failed:', msg);
+      if (/Bluetooth|Nearby/i.test(msg)) {
+        Alert.alert('Bluetooth', msg);
+      }
     }
   }, [setBleStatus, setConnectedDevice]);
 

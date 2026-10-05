@@ -3,7 +3,7 @@ import OpenAI from 'openai';
 import type { Env } from '../types';
 import { VOICE_STYLE_TO_ID } from '../lib/prompts';
 import type { DogVoiceStyle } from '../lib/prompts';
-import { COLLAR_SAMPLE_RATE, adpcmEncode, downsample, normalize, resample, ulawEncode } from '../lib/audio';
+import { COLLAR_SAMPLE_RATE, adpcmEncode, compress, downsample, normalize, resample, ulawEncode } from '../lib/audio';
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -112,15 +112,19 @@ async function ttsForCollar(
     pcm16 = await openaiPcm16k(c.env, text, voice, style, rate);
   }
 
+  // Speech compression (+ makeup to 0.9 peak): louder on a small speaker
+  // without clipping. COLLAR_COMPRESS=off disables it.
+  const shaped = c.env.COLLAR_COMPRESS === 'off' ? normalize(pcm16, 0.9) : compress(pcm16, 16000);
+
   if (format === 'adpcm16k') {
-    const adpcm = adpcmEncode(normalize(pcm16, 0.9));
+    const adpcm = adpcmEncode(shaped);
     console.log('[tts] collar adpcm16k — voice:', voice, `${(pcm16.length / 16000).toFixed(1)} s, ${adpcm.length} B`);
     return new Response(adpcm, {
       headers: { 'Content-Type': 'audio/x-adpcm', 'X-Sample-Rate': '16000', 'X-Encoding': 'adpcm' },
     });
   }
 
-  const pcm8 = normalize(downsample(pcm16, 2), 0.9);
+  const pcm8 = downsample(shaped, 2);
   const ulaw = ulawEncode(pcm8);
   console.log('[tts] collar ulaw8k — voice:', voice, `${(pcm8.length / COLLAR_SAMPLE_RATE).toFixed(1)} s`);
   return new Response(ulaw, {

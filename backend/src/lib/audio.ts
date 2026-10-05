@@ -133,3 +133,47 @@ export function adpcmEncode(pcm: Int16Array): Uint8Array {
   }
   return out;
 }
+
+/**
+ * Simple speech compressor: a peak-following envelope (fast attack, slow
+ * release) drives gain reduction above `thresholdDb` at `ratio`:1, then the
+ * result is peak-normalized. Raises the average loudness of speech (quiet
+ * syllables come up) without raising the peaks, so a small speaker sounds
+ * louder with no extra clipping.
+ */
+export function compress(
+  pcm: Int16Array,
+  sampleRate: number,
+  opts: { thresholdDb?: number; ratio?: number; attackMs?: number; releaseMs?: number; target?: number } = {},
+): Int16Array {
+  const thresholdDb = opts.thresholdDb ?? -18;
+  const ratio = opts.ratio ?? 3;
+  const attack = Math.exp(-1 / ((opts.attackMs ?? 5) * 0.001 * sampleRate));
+  const release = Math.exp(-1 / ((opts.releaseMs ?? 120) * 0.001 * sampleRate));
+  const threshold = 32767 * Math.pow(10, thresholdDb / 20);
+
+  const out = new Float32Array(pcm.length);
+  let env = 0;
+  for (let i = 0; i < pcm.length; i++) {
+    const x = pcm[i]!;
+    const a = Math.abs(x);
+    env = a > env ? attack * env + (1 - attack) * a : release * env + (1 - release) * a;
+    let gain = 1;
+    if (env > threshold) {
+      // gain so that the envelope above threshold is reduced by the ratio
+      const over = env / threshold;
+      gain = Math.pow(over, 1 / ratio - 1);
+    }
+    out[i] = x * gain;
+  }
+  // Normalize to the target peak (makeup gain).
+  let peak = 1;
+  for (let i = 0; i < out.length; i++) peak = Math.max(peak, Math.abs(out[i]!));
+  const g = ((opts.target ?? 0.9) * 32767) / peak;
+  const res = new Int16Array(out.length);
+  for (let i = 0; i < out.length; i++) {
+    const v = Math.round(out[i]! * g);
+    res[i] = v > 32767 ? 32767 : v < -32768 ? -32768 : v;
+  }
+  return res;
+}
